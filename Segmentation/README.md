@@ -46,9 +46,8 @@ When a diagnostic message is initiated by a user (e.g., an ECU tester or diagnos
 
 > ✅ **In both cases**, ISO-TP abstracts away the complexities of CAN frame sizes, ensuring a seamless diagnostic message exchange between ECUs and testing tools.
 
-Sure! Here’s the entire **“Gateway: Application to Network Layer”** section rewritten as a cohesive, well-structured paragraph-based explanation:
-
 ---
+
 ## 🛠️ Implementation of DoCAN
 
 This section explores the core implementation of **DoCAN ISO-TP**, detailing how it enables efficient diagnostic communication across the **Application**, **Network**, and **Transport Layers**. The implementation supports all addressing modes and is optimized for reliability and flexibility in automotive systems.
