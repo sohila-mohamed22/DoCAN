@@ -359,7 +359,7 @@ Suppose a payload of 5 bytes needs to be sent over Classical CAN (which allows 8
 | Mode                    | Frame Payload                              | Description                                 |
 |-------------------------|---------------------------------------------|---------------------------------------------|
 | **Optimization Enabled** | `0x03 0x22 0xF1 0x90 0x00`                  | Only 5 bytes are used; no padding.          |
-| **Optimization Disabled**| `0x03 0x22 0xF1 0x90 0x00 0x00 0x00 0x00`   | All unused bytes padded with `0x00`.        |
+| **Optimization Disabled**| `0x03 0x22 0xF1 0x90 0x00 0xCC 0xCC 0xCC`   | All unused bytes padded with `0x00`.        |
 
 ✅ **Enabled** mode reduces bandwidth usage and improves throughput.  
 ✅ **Disabled** mode maximizes compatibility with strict ECUs.
@@ -422,6 +422,165 @@ send() →
 - **Reusable helpers** (`SharedBuffersHandler`, `TimerManager`, `AddressMapper`)
 
 ---
+Certainly! Here's an overview and workflow summary for the `FirstFrameHandler` class, which handles the transmission of the First Frame (FF) in multi-frame ISO 15765-2 CAN communication:
+
+---
+
+### 📦 FirstFrameHandler Class Overview
+
+This class manages the transmission of **First Frame (FF)** messages in the ISO 15765-2 protocol over CAN, supporting:
+- 🧩 Classical CAN and CAN FD
+- 🛠 Multiple addressing modes (Normal, Fixed Normal, Extended, Mixed)
+- ✅ Variable length frames (≤ 4095 and > 4095 bytes)
+- 📡 Asynchronous transmission via the Data Link Layer
+
+### 📤 Responsibilities
+
+1. **Validate message length** to ensure it does not exceed the maximum supported size.
+2. **Determine addressing mode** and prepare addressing byte if necessary.
+3. **Construct frame with Protocol Control Information (PCI)** based on frame length.
+4. **Handle different frame length scenarios** (≤ 4095 and > 4095 bytes).
+5. **Insert addressing byte** for Extended or Mixed addressing modes.
+6. **Transmit frame asynchronously** and wait for result using timeout.
+7. **Log all details** for debugging and analysis.
+
+---
+
+### 🔄 Workflow Summary
+
+```text
+send() →
+  ├─ Extract core transmission parameters from the request
+  ├─ Validate total data length
+  ├─ Determine frame characteristics (frame size, extended length)
+  ├─ Prepare first frame buffer
+  ├─ Handle addressing modes:
+  │     ├─ Extended Addressing → Include target address
+  │     ├─ Mixed Addressing    → Include network address extension
+  ├─ Construct Protocol Control Information (PCI)
+  │     ├─ 4-byte length for FF_DL > 4095
+  │     ├─ 2-byte length for FF_DL ≤ 4095
+  ├─ Insert addressing byte if required
+  ├─ Copy initial data payload into the frame
+  ├─ Store frame in multi-frame list for logging
+  ├─ Determine Data Length Code (DLC)
+  ├─ Asynchronously transmit first frame via Data Link Layer
+  ├─ Wait for transmission completion with timeout
+  │     ├─ Handle successful transmission
+  │     ├─ Handle transmission timeout
+  │     ├─ Handle execution errors
+  └─ Return transmission result indicating success or failure
+```
+---
+
+### 🔄 Addressing Mode Handling
+
+#### 🟩 Normal Addressing (default)
+- No additional addressing byte required.
+- PCI and initial data directly included in the frame.
+
+##### 🔹 Data Length ≤ 4095
+
+The figure below shows the exact frame layout for a **First Frame** using **Normal Addressing** when the data length is less than or equal to 4095:
+
+![image](https://github.com/user-attachments/assets/1d019658-0ef5-4202-aab9-1be169913ece)
+
+> 🧠 **Explanation**:  
+> - The **first byte** is the **PCI byte**, where the upper nibble (`0x1`) indicates a *First Frame*, and the lower nibble represents part of the *data length* (FF_DL).  
+> - The second byte completes the data length specification (FF_DL).  
+> - The remaining bytes are used for **initial diagnostic data**.  
+> - No addressing bytes are included in Normal Addressing.
+
+> 📌 **Note:**  
+> If there are remaining unused bytes in the frame, these bytes are **padded with `0xCC`** to ensure the frame matches the expected Data Length Code (DLC) format.
+
+##### 🔹 Data Length > 4095
+When the data length exceeds 4095, the PCI expands to accommodate the larger payload size. The frame layout is shown below:
+
+![image](https://github.com/user-attachments/assets/9341c2f5-d7ef-44df-834b-e30a71861c3d)
+
+> 🧠 **Explanation**:  
+> - The **first PCI byte** remains `0x1` indicating a *First Frame*.  
+> - The subsequent bytes specify the data length explicitly (FF_DL).  
+> - The rest of the frame contains the **initial diagnostic data payload**.
+> - This layout allows for a data length greater than 4095 bytes, as depicted in the diagram.
+
+#### 🟨 Extended Addressing
+- Adds a single **Target Address** byte at the beginning.
+- Useful in UDS when more than one ECU is on the bus.
+
+##### 🔹 Data Length ≤ 4095
+The figure below shows the exact frame layout for a **First Frame** using **Extended Addressing** when the data length is less than or equal to 4095:
+
+![diagram-export-4-23-2025-11_52_01-AM](https://github.com/user-attachments/assets/69a605f1-1c92-4b93-a656-473bd42bd9fe)
+
+> 🧠 **Explanation**:  
+> - The **first byte** is the **Target Address**, which identifies the destination ECU.  
+> - The **second byte** is the **PCI**, where the upper nibble (`0x1`) denotes a *First Frame*, and the lower nibble represents part of the *data length* (FF_DL).  
+> - The third byte completes the data length specification (FF_DL).  
+> - Remaining bytes are filled with the **initial diagnostic payload**.
+
+---
+
+##### 🔹 Data Length > 4095
+In cases where the data length exceeds 4095, the layout supports more payload and includes an **expanded PCI**:
+
+![diagram-export-4-23-2025-11_51_42-AM](https://github.com/user-attachments/assets/6635255d-9452-4aba-bd1e-6018bac48c0e)
+
+> 🧠 **Explanation**:  
+> - The **first byte** is the **Target Address**.  
+> - The **second byte** is the **First PCI byte** (`0x1` for First Frame).  
+> - Subsequent bytes specify the **payload length** (FF_DL).  
+> - The rest is **initial diagnostic data**.
+
+#### 🟦 Mixed Addressing
+- Adds a **Remote Address** byte (Network Address Extension).
+- Often used in diagnostic gateways or load balancers.
+
+##### 🔹 Data Length ≤ 4095
+The figure below illustrates the **First Frame** layout using **Mixed Addressing** when the data length is less than or equal to 4095:
+
+![image](https://github.com/user-attachments/assets/a5234913-91bf-4da3-938d-3c68a57851f8)
+
+> 🧠 **Explanation**:  
+> - The **first byte** is the **Remote Address**, used to specify the target network behind a gateway.  
+> - The **second byte** is the **PCI**, with upper nibble `0x1` for *First Frame* and lower nibble for part of the *data length* (FF_DL).  
+> - The third byte completes the data length specification (FF_DL).  
+> - The remaining bytes are **initial diagnostic data**.
+
+---
+
+##### 🔹 Data Length > 4095
+In cases where the data length exceeds 4095, the frame expands to support larger payloads with a multi-byte PCI field:
+
+![image](https://github.com/user-attachments/assets/ad68e05b-ef0a-4f66-8554-62444a76ecf9)
+
+> 🧠 **Explanation**:  
+> - The **first byte** is the **Remote Address**.  
+> - The **second byte** is the **first PCI byte** (`0x1` for First Frame).  
+> - Subsequent bytes hold the **data length** (FF_DL).  
+> - Remaining bytes contain the **initial diagnostic payload**.
+
+> 📌 **Note:**  
+> The layout and inclusion of additional bytes depend on the `TX_DL` value. If `TX_DL` is equal to or greater than 8, the frame can accommodate more data, as shown in the diagram.
+---
+
+### ❗ Error Handling / Validation
+
+| Stage | Error Check | Handling |
+|-------|-------------|----------|
+| Frame Length Mapping | If `DLCMapping.getNextValidCANSize` returns `-1` | Logs error + returns `N_ERROR` |
+| PCI Construction | Verifies length depending on CAN type | Uses appropriate PCI length |
+| Frame Padding | Ensures padded with `0xCC` if frame is shorter | ✅ Done automatically |
+| DLC Mapping | If `DLCMapping.getDLC` returns `INVALID_DLC` | Logs error + returns `N_ERROR` |
+| Async Transmission | - `TimeoutException`: logs + cancels + returns `N_TIMEOUT_A`<br>- `ExecutionException` or `InterruptedException`: logs + cancels + returns `N_ERROR` |
+
+### 🧪 Robustness Features
+
+- ✅ *Timeout-controlled Future* for transmission using the `N_As` timer
+- ✅ *Detailed logging* at every step (LoggerUtility)
+- ✅ *Support for all addressing modes* (Normal, Fixed Normal, Extended, Mixed)
+- ✅ *Adaptability to both CAN types* (Classical CAN and CAN FD)
 
 
 
