@@ -11,6 +11,7 @@ Welcome to **DoCAN ISO-TP**, a powerful and flexible implementation of the **ISO
      - [🔀 Gateway: Application to Network Layer](#-gateway-application-to-network-layer)
      - [🌐 Network Layer Implementation](#-network-layer-implementation)
      - [🚚 Transport Layer Implementation](#-transport-layer-implementation)
+     - [🧪 Robustness Features](#-robustness-features)
 
 ---
 ## 📘 Overview
@@ -57,7 +58,7 @@ This section explores the core implementation of **DoCAN ISO-TP**, detailing how
 
 The **Transmission Process** covers the end-to-end path that a diagnostic request takes—from the Application Layer all the way to the Transport Layer. This ensures that each message is properly prepared, segmented (if needed), and transmitted over the CAN bus.
 
-#### 🔀 Gateway: Application to Network Layer
+### 🔀 Gateway: Application to Network Layer
 
 The **gateway** between the **Application Layer** and the **Network Layer** is the entry point for diagnostic communication in DoCAN ISO-TP. The diagram below illustrates this gateway, where a diagnostic request from the Application Layer is passed to the Network/Transport Layer via the `BaseConnection.sendRequest(Request appLayerRequest): A_Result` method.
 
@@ -67,7 +68,7 @@ The result, `A_Result`, indicates whether the request was **successfully placed 
 
 ---
 
-#### 🌐 Network Layer Implementation
+### 🌐 Network Layer Implementation
 
 When this API is called, it triggers a sequence of operations within the Network Layer. This includes processing the request, preparing the message according to the ISO-TP (ISO 15765-2) protocol, fragmenting the payload if needed, and initiating transmission onto the CAN bus. The Network Layer also provides feedback on whether the transmission was successful, which is essential for the Application Layer to confirm message delivery.
 
@@ -97,7 +98,7 @@ public N_Result request(Request A_Request) {
         NetworkRequestDecoder request = new NetworkRequestDecoder(A_Request);
         ...
 ```
-##### 🛠 Responsibilities of NetworkRequestDecoder
+#### 🛠 Responsibilities of NetworkRequestDecoder
 
 - **Address Extraction**: Extracts source (N_SA) and target (N_TA) addresses.
 - **Address Extension**: If the message type is **Remote Diagnostics**, it also extracts the **remote address (N_AE)**, which is used as an extension to support addressing remote ECUs.
@@ -120,13 +121,13 @@ public N_Result request(Request A_Request) {
 
 ---
 
-#### 🚚 Transport Layer Implementation
+## 🚚 Transport Layer Implementation
 
 Once the `NetworkRequestDecoder` has parsed and validated the incoming diagnostic request, the Transport Layer (`N_USData`) takes over to ensure the message is correctly formatted, fits the CAN specifications, and is transmitted over the bus according to ISO 15765-2 rules.
 
 Here's a breakdown of the core steps performed by the `request(Request A_Request)` method in the Transport Layer:
 
-##### ❗ Error Handling & Validation Checks
+### ❗ Error Handling & Validation Checks
 
 1. **TX_DL Validation**  
    Ensures that the configured `TX_DL` (transmission data length) is valid.  
@@ -158,7 +159,7 @@ Here's a breakdown of the core steps performed by the `request(Request A_Request
 
 ---
 
-##### 📦 Frame Type Selection
+### 📦 Frame Type Selection
 
 After all validations, the system determines the optimal frame type:
 
@@ -180,23 +181,22 @@ After all validations, the system determines the optimal frame type:
 
 ---
 
-##### 🔄 Transmission Handlers
+### 🔄 Transmission Handlers
 
 Here’s a clear, structured breakdown of the `SingleFrameHandler` class under a refined section, with improved readability and emphasis on **error handling**, organized by **addressing mode**:
 
-### 📦 `SingleFrameHandler` Class Overview
+## 📦 `SingleFrameHandler` Class Overview
 
 This class handles **Single Frame (SF)** transmission in the ISO 15765-2 protocol over CAN, supporting:
 - 🧩 Classical CAN and CAN FD
 - 🛠 Multiple addressing modes (Normal, Extended, Mixed)
 - ✅ Frame padding, PCI construction, and async transmission via the Data Link Layer
 
-#### 🧾 Communication Flow: Single Frame
+### 🧾 Communication Flow: Single Frame
 
 Below is a simplified sequence diagram illustrating how a Single Frame is transmitted:
 ![diagram-export-4-23-2025-9_44_02-AM](https://github.com/user-attachments/assets/0a4da223-e029-4418-b170-8495daa07e93)
 
----
 
 ### 📤 Responsibilities
 
@@ -208,7 +208,6 @@ Below is a simplified sequence diagram illustrating how a Single Frame is transm
 6. **Send frame asynchronously** and wait for result using timeout.
 7. **Log all details** for debugging and analysis.
 
----
 ### 🔄 Workflow Summary
 
 ```text
@@ -238,10 +237,10 @@ send() →
   │     ├─ Handle execution errors
   └─ Return transmission result indicating success, failure, or timeout
 ```
----
+
 ### 🔄 Addressing Mode Handling
 
-#### 🟩 Normal Addressing (default)
+#### 🟩 **Normal Addressing (default)**
 - No additional addressing byte required.
 - PCI and data directly included in frame.
 
@@ -283,8 +282,6 @@ The figure below shows the exact frame layout for a **Single Frame** using **Ext
 > - Remaining bytes are filled with the **diagnostic payload**.  
 > - Total frame size = 8 bytes.
 
----
-
 ##### 🔹 CAN FD (`TX_DL > 8`)
 In **CAN FD**, the layout is similar but supports more payload and includes an **expanded PCI**:
 
@@ -300,7 +297,7 @@ In **CAN FD**, the layout is similar but supports more payload and includes an *
 - Adds a **Remote Address** byte (Network Address Extension).
 - Often used in diagnostic gateways or load balancers.
 
-##### 🔹 Classical CAN (`TX_DL = 8`)
+#### 🔹 Classical CAN (`TX_DL = 8`)
 The figure below illustrates the **Single Frame** layout using **Mixed Addressing** in **Classical CAN**:
 
 ![diagram-export-4-23-2025-9_28_51-AM](https://github.com/user-attachments/assets/ec6c0cc9-d821-4fd5-9abb-5dc7cacc57cf)
@@ -310,9 +307,7 @@ The figure below illustrates the **Single Frame** layout using **Mixed Addressin
 > - The **second byte** is the **PCI**, with upper nibble `0x0` for *Single Frame* and lower nibble for *data length*.  
 > - The remaining bytes are **diagnostic data**.
 
----
-
-##### 🔹 CAN FD (`TX_DL > 8`)
+#### 🔹 CAN FD (`TX_DL > 8`)
 In **CAN FD**, the frame expands to support larger payloads with a two-byte PCI field:
 
 ![image](https://github.com/user-attachments/assets/b4eceb19-f510-464b-b5f9-7671c7e9a4dc)
@@ -322,8 +317,6 @@ In **CAN FD**, the frame expands to support larger payloads with a two-byte PCI 
 > - The **second byte** is the **first PCI byte** (`0x0` for Single Frame).  
 > - The **third byte** holds the **data length**.  
 > - Remaining bytes contain the **diagnostic payload**.  
-
----
 
 ### ❗ Error Handling / Validation
 
@@ -335,38 +328,9 @@ In **CAN FD**, the frame expands to support larger payloads with a two-byte PCI 
 | DLC Mapping | If `DLCMapping.getDLC` returns `INVALID_DLC` | Logs error + returns `N_ERROR` |
 | Async Transmission | - `TimeoutException`: logs + cancels + returns `N_TIMEOUT_A`<br>- `ExecutionException` or `InterruptedException`: logs + cancels + returns `N_ERROR` |
 
-### 🧪 Robustness Features
-
-- ✅ *Timeout-controlled Future* for transmission
-- ✅ *Detailed logging* at every step (LoggerUtility, PrintDetailedLogs)
-- ✅ *GUI-configurable optimization* via GuiHelper.isDataOptimizationEnabled
-
-🔍 **Role of Data Optimization**
-
-The *data optimization* feature determines whether to **add padding** to unused bytes in the CAN frame payload or to **optimize** the message length by transmitting only the necessary data. This feature is crucial for ensuring compatibility with different ECUs that may or may not support optimized (unpadded) data transmission.
-
-- If **data optimization is enabled**, the system **removes unnecessary padding** to reduce frame size and improve efficiency.
-- If **data optimization is disabled**, the system **pads all unused bytes** to maintain a fixed-length payload, ensuring compatibility with ECUs that expect fully padded frames.
-
-⚙️ This feature is designed to be **configurable**, allowing the tool to operate with *any ECU* — regardless of whether it expects optimized frames or not. By enabling or disabling optimization based on the ECU’s capabilities, the implementation ensures broader compatibility and reliability.
-
 ---
 
-📊 **Example Comparison: Data Optimization Enabled vs Disabled**
-
-Suppose a payload of 5 bytes needs to be sent over Classical CAN (which allows 8 bytes per frame):
-
-| Mode                    | Frame Payload                              | Description                                 |
-|-------------------------|---------------------------------------------|---------------------------------------------|
-| **Optimization Enabled** | `0x03 0x22 0xF1 0x90 0x00`                  | Only 5 bytes are used; no padding.          |
-| **Optimization Disabled**| `0x03 0x22 0xF1 0x90 0x00 0xCC 0xCC 0xCC`   | All unused bytes padded with `0x00`.        |
-
-✅ **Enabled** mode reduces bandwidth usage and improves throughput.  
-✅ **Disabled** mode maximizes compatibility with strict ECUs.
-
----
-
-### 🚚 `MultiFrameHandler` Class Overview
+## 🚚 `MultiFrameHandler` Class Overview
 
 This class manages **Multi-Frame (MF)** transmission in the **ISO 15765-2** protocol, supporting:
 - 🧩 Classical CAN and CAN FD
@@ -374,15 +338,11 @@ This class manages **Multi-Frame (MF)** transmission in the **ISO 15765-2** prot
 - 📦 First Frame + Consecutive Frame logic
 - ⚙️ Flow control handling, timing, retries, and async sending
 
----
-
 ### 🔁 Communication Flow: Multi-Frame
 
 Presented below is a simplified sequence diagram that demonstrates the transmission process of MultiFrames:
 
    ![diagram-export-4-23-2025-9_43_01-AM](https://github.com/user-attachments/assets/2b5b0d58-6dd3-4d3c-962d-b43f6ac40831)
-
----
 
 ### 📤 Responsibilities
 
@@ -393,9 +353,6 @@ Presented below is a simplified sequence diagram that demonstrates the transmiss
 5. **Handle addressing schemes** and frame layout for both CAN types.
 6. **Provide timeout, retry, and validation logic.**
 
-Great! Here's a focused explanation of the `MultiFrameHandler` class only — no First Frame or Consecutive Frame details yet. This will serve as a clear prelude to your detailed breakdown later.
-
----
 
 ### 🔄 Workflow Summary
 
@@ -412,21 +369,10 @@ send() →
   ├─ Continue loop until transmission is successful or fails
   └─ Log detailed transmission information (if successful)
 ```
----
-
-### 🧠 Smart Features
-
-- **Auto timeout with `N_Bs` timer**
-- **Dynamic support for all addressing modes** (Normal, Extended, Mixed)
-- **Adaptable to Classical CAN or CAN FD**
-- **Reusable helpers** (`SharedBuffersHandler`, `TimerManager`, `AddressMapper`)
-
----
-Certainly! Here's an overview and workflow summary for the `FirstFrameHandler` class, which handles the transmission of the First Frame (FF) in multi-frame ISO 15765-2 CAN communication:
 
 ---
 
-### 📦 FirstFrameHandler Class Overview
+## 📦 FirstFrameHandler Class Overview
 
 This class manages the transmission of **First Frame (FF)** messages in the ISO 15765-2 protocol over CAN, supporting:
 - 🧩 Classical CAN and CAN FD
@@ -444,7 +390,6 @@ This class manages the transmission of **First Frame (FF)** messages in the ISO 
 6. **Transmit frame asynchronously** and wait for result using timeout.
 7. **Log all details** for debugging and analysis.
 
----
 
 ### 🔄 Workflow Summary
 
@@ -471,7 +416,6 @@ send() →
   │     ├─ Handle execution errors
   └─ Return transmission result indicating success or failure
 ```
----
 
 ### 🔄 Addressing Mode Handling
 
@@ -520,8 +464,6 @@ The figure below shows the exact frame layout for a **First Frame** using **Exte
 > - The third byte completes the data length specification (FF_DL).  
 > - Remaining bytes are filled with the **initial diagnostic payload**.
 
----
-
 ##### 🔹 Data Length > 4095
 In cases where the data length exceeds 4095, the layout supports more payload and includes an **expanded PCI**:
 
@@ -548,8 +490,6 @@ The figure below illustrates the **First Frame** layout using **Mixed Addressing
 > - The third byte completes the data length specification (FF_DL).  
 > - The remaining bytes are **initial diagnostic data**.
 
----
-
 ##### 🔹 Data Length > 4095
 In cases where the data length exceeds 4095, the frame expands to support larger payloads with a multi-byte PCI field:
 
@@ -563,7 +503,6 @@ In cases where the data length exceeds 4095, the frame expands to support larger
 
 > 📌 **Note:**  
 > The layout and inclusion of additional bytes depend on the `TX_DL` value. If `TX_DL` is equal to or greater than 8, the frame can accommodate more data, as shown in the diagram.
----
 
 ### ❗ Error Handling / Validation
 
@@ -575,12 +514,122 @@ In cases where the data length exceeds 4095, the frame expands to support larger
 | DLC Mapping | If `DLCMapping.getDLC` returns `INVALID_DLC` | Logs error + returns `N_ERROR` |
 | Async Transmission | - `TimeoutException`: logs + cancels + returns `N_TIMEOUT_A`<br>- `ExecutionException` or `InterruptedException`: logs + cancels + returns `N_ERROR` |
 
-### 🧪 Robustness Features
+---
 
-- ✅ *Timeout-controlled Future* for transmission using the `N_As` timer
-- ✅ *Detailed logging* at every step (LoggerUtility)
-- ✅ *Support for all addressing modes* (Normal, Fixed Normal, Extended, Mixed)
-- ✅ *Adaptability to both CAN types* (Classical CAN and CAN FD)
+## 📦 ConsecutiveFrameHandler Class Overview
+
+This class handles the transmission of **Consecutive Frames (CFs)** in the ISO 15765-2 protocol over CAN, supporting:
+- 🧩 Flow Control (FC) constraint management
+- 🛠 CAN FD padding support
+- ✅ Asynchronous transmission with timeout handling
+- 🔄 Sequence number tracking
+- ⏱️ Separation time management
+
+### 📤 Responsibilities
+
+1. **Determine addressing mode** and prepare addressing byte if necessary.
+2. **Calculate frame parameters** including data per frame and total frames.
+3. **Construct and send Consecutive Frames** with sequence numbers.
+4. **Manage separation time and block size** constraints.
+5. **Handle padding for the last frame** if necessary.
+6. **Log all details** for debugging and analysis.
+
+### 🔄 Addressing Mode Handling 
+
+#### 🟩 Normal Addressing (default)
+- No additional addressing byte required.
+- PCI and diagnostic data directly included in the frame.
+
+##### 🔹 Frame Layout
+
+The figure below shows the exact frame layout for a **Consecutive Frame** using **Normal Addressing**:
+
+![image](https://github.com/user-attachments/assets/77a0cc93-cdf9-465e-8be8-dbe0e25b48a5)
+
+> 🧠 **Explanation**:  
+> - The **first byte** is the **PCI byte**, where the upper nibble (`0x2`) indicates a *Consecutive Frame*, and the lower nibble represents the *Sequence Number* (0-15).  
+> - The remaining bytes are used for **diagnostic data**.  
+> - No addressing bytes are included in Normal Addressing.
+
+> 📌 **Note:**  
+> If there are remaining unused bytes in the frame, these bytes are **padded with `0xCC`** to ensure the frame matches the expected Data Length Code (DLC) format.
+
+#### 🟨 Extended Addressing
+- Adds a single **Target Address** byte at the beginning.
+- Useful in UDS when more than one ECU is on the bus.
+
+##### 🔹 Frame Layout
+
+The figure below shows the exact frame layout for a **Consecutive Frame** using **Extended Addressing**:
+
+![image](https://github.com/user-attachments/assets/1a5113a6-c8e5-4932-9135-3657e827aaa1)
+
+> 🧠 **Explanation**:  
+> - The **first byte** is the **Target Address**, which identifies the destination ECU.  
+> - The **second byte** is the **PCI**, where the upper nibble (`0x2`) denotes a *Consecutive Frame*, and the lower nibble represents the *Sequence Number*.  
+> - Remaining bytes are filled with the **diagnostic data**.
 
 
+#### 🟦 Mixed Addressing
+- Adds a **Remote Address** byte (Network Address Extension).
+- Often used in diagnostic gateways or load balancers.
+
+##### 🔹 Frame Layout
+
+The figure below illustrates the **Consecutive Frame** layout using **Mixed Addressing**:
+
+![image](https://github.com/user-attachments/assets/cb0c21bd-dceb-4af4-a1eb-82a2515c6b1b)
+
+> 🧠 **Explanation**:  
+> - The **first byte** is the **Remote Address**, used to specify the target network behind a gateway.  
+> - The **second byte** is the **PCI**, with upper nibble `0x2` for *Consecutive Frame* and lower nibble for the *Sequence Number*.  
+> - The remaining bytes are **diagnostic data**.
+
+> 📌 **Note:**  
+> The layout and inclusion of additional bytes depend on the `TX_DL` value. If `TX_DL` is equal to or greater than 8, the frame can accommodate more data, as shown in the diagram.
+
+This structured approach ensures that Consecutive Frames are correctly formatted and transmitted according to the addressing mode and CAN type, facilitating reliable communication in CAN networks.
+
+### ❗ Error Handling / Validation
+
+| Stage | Error Check | Handling |
+|-------|-------------|----------|
+| Frame Length Mapping | If `DLCMapping.getNextValidCANSize` returns `-1` | Logs error + returns `N_ERROR` |
+| PCI Construction | Verifies length depending on data size | Uses appropriate PCI length |
+| Frame Padding | Ensures padded with `0xCC` if frame is shorter | ✅ Done automatically |
+| DLC Mapping | If `DLCMapping.getDLC` returns `INVALID_DLC` | Logs error + returns `N_ERROR` |
+| Async Transmission | - `TimeoutException`: logs + cancels + returns `N_TIMEOUT_A`<br>- `ExecutionException` or `InterruptedException`: logs + cancels + returns `N_ERROR` |
+
+---
+
+## Robustness Features
+
+- **Timeout-Controlled Transmission**: Utilizes a timeout mechanism (`N_As` and `N_Bs` timers) to ensure that each frame is transmitted within a specified time window, preventing indefinite waiting periods.
+- **Detailed Logging**: Provides detailed logging at each step of the transmission process (using `LoggerUtility` and `PrintDetailedLogs`) for debugging and analysis, enhancing maintainability and troubleshooting.
+- **Error Handling and Validation**: Implements comprehensive error handling for transmission failures, including logging errors and retry mechanisms. Validates all critical parameters such as TX_DL, CAN ID, and addressing mode.
+- **Support for All Addressing Modes**: Accommodates Normal, Fixed Normal, Extended, and Mixed Addressing modes, providing flexibility for various network configurations.
+- **Adaptability to CAN Types**: Supports both Classical CAN and CAN FD, allowing for seamless integration with different vehicle networks.
+- **GUI-configurable optimization** via GuiHelper.isDataOptimizationEnabled
+
+🔍 **Role of Data Optimization**
+
+The *data optimization* feature determines whether to **add padding** to unused bytes in the CAN frame payload or to **optimize** the message length by transmitting only the necessary data. This feature is crucial for ensuring compatibility with different ECUs that may or may not support optimized (unpadded) data transmission.
+
+- If **data optimization is enabled**, the system **removes unnecessary padding** to reduce frame size and improve efficiency.
+- If **data optimization is disabled**, the system **pads all unused bytes** to maintain a fixed-length payload, ensuring compatibility with ECUs that expect fully padded frames.
+
+⚙️ This feature is designed to be **configurable**, allowing the tool to operate with *any ECU* — regardless of whether it expects optimized frames or not. By enabling or disabling optimization based on the ECU’s capabilities, the implementation ensures broader compatibility and reliability.
+
+
+📊 **Example Comparison: Data Optimization Enabled vs Disabled**
+
+Suppose a payload of 5 bytes needs to be sent over Classical CAN (which allows 8 bytes per frame):
+
+| Mode                    | Frame Payload                              | Description                                 |
+|-------------------------|---------------------------------------------|---------------------------------------------|
+| **Optimization Enabled** | `0x03 0x22 0xF1 0x90 0x00`                  | Only 5 bytes are used; no padding.          |
+| **Optimization Disabled**| `0x03 0x22 0xF1 0x90 0x00 0xCC 0xCC 0xCC`   | All unused bytes padded with `0x00`.        |
+
+✅ **Enabled** mode reduces bandwidth usage and improves throughput.  
+✅ **Disabled** mode maximizes compatibility with strict ECUs.
 
